@@ -8,12 +8,13 @@
 </head>
 
 <body class="center">
+
 <div style="width:min(420px,100%)">
   <h1>✈️ Ground Handling Log</h1>
+  <p class="small">Login für Bodenabfertiger</p>
 
   <div class="card">
     <button onclick="loginGoogle()">Mit Google anmelden</button>
-    <button onclick="loginApple()" class="btn-secondary">Mit Apple anmelden</button>
 
     <hr>
 
@@ -27,15 +28,15 @@
   </div>
 </div>
 
-<!-- Firebase SDKs (COMPAT – stabil & simpel) -->
+<!-- Firebase SDKs (COMPAT – stabil für iOS Safari) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-/* ================================
+/* ==========================
    FIREBASE INITIALISIERUNG
-================================ */
+========================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCC9zB_me4qdyBmHZ0TeUDPB1WoPNa6e1A",
   authDomain: "ground-handling-log.firebaseapp.com",
@@ -48,12 +49,10 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const statusEl = document.getElementById("status");
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  console.log("Auth geladen:", typeof auth);
 
-/* ================================
-   HILFSFUNKTIONEN
-================================ */
+/* ==========================
+   HELFER
+========================== */
 async function ensureUser(user) {
   try {
     const ref = db.collection("users").doc(user.uid);
@@ -84,45 +83,22 @@ function goDashboard() {
   window.location.replace("dashboard.html");
 }
 
-/* ================================
-   GOOGLE LOGIN
-================================ */
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-
+/* ==========================
+   GOOGLE LOGIN (REDIRECT)
+========================== */
 window.loginGoogle = async function () {
   try {
-    statusEl.textContent = "Google Login…";
-    if (isIOS) {
-      await auth.signInWithRedirect(googleProvider);
-    } else {
-      await auth.signInWithPopup(googleProvider);
-    }
+    statusEl.textContent = "Weiterleitung zu Google…";
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithRedirect(provider);
   } catch (e) {
     statusEl.textContent = "Google Fehler: " + e.message;
   }
 };
 
-/* ================================
-   APPLE LOGIN
-================================ */
-const appleProvider = new firebase.auth.OAuthProvider("apple.com");
-
-window.loginApple = async function () {
-  try {
-    statusEl.textContent = "Apple Login…";
-    if (isIOS) {
-      await auth.signInWithRedirect(appleProvider);
-    } else {
-      await auth.signInWithPopup(appleProvider);
-    }
-  } catch (e) {
-    statusEl.textContent = "Apple Fehler: " + e.message;
-  }
-};
-
-/* ================================
+/* ==========================
    EMAIL LOGIN
-================================ */
+========================== */
 window.loginEmail = async function () {
   try {
     statusEl.textContent = "Login…";
@@ -135,9 +111,9 @@ window.loginEmail = async function () {
   }
 };
 
-/* ================================
+/* ==========================
    EMAIL REGISTRIERUNG
-================================ */
+========================== */
 window.registerEmail = async function () {
   try {
     statusEl.textContent = "Registrierung…";
@@ -150,11 +126,12 @@ window.registerEmail = async function () {
   }
 };
 
-/* ================================
-   REDIRECT (iOS) + SESSION
-================================ */
+/* ==========================
+   REDIRECT + SESSION
+========================== */
 auth.getRedirectResult().then(async (result) => {
   if (result && result.user) {
+    statusEl.textContent = "✅ Eingeloggt…";
     await ensureUser(result.user);
     goDashboard();
   }
