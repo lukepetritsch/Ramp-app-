@@ -49,6 +49,7 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const statusEl = document.getElementById("status");
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  console.log("Auth geladen:", typeof auth);
 
 /* ================================
    HILFSFUNKTIONEN
