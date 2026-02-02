@@ -1,1 +1,77 @@
-<h1>User Profil</h1>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Profil • Ground Handling Log</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container" style="padding-bottom:72px">
+    <h2>👤 Profil</h2>
+    <div class="card" id="box">Lade…</div>
+  </div>
+
+  <nav>
+    <button data-go="dashboard.html">📊</button>
+    <button data-go="aircraft.html">✈️</button>
+    <button data-go="album.html">🎴</button>
+    <button class="active" data-go="social.html">👥</button>
+  </nav>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCC9zB_me4qdyBmHZ0TeUDPB1WoPNa6e1A",
+  authDomain: "ground-handling-log.firebaseapp.com",
+  projectId: "ground-handling-log",
+  appId: "1:771821879817:web:35ad14da4ab4613b832ed8"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(location.search);
+const uid = params.get("uid");
+const box = document.getElementById("box");
+
+onAuthStateChanged(auth, async (me)=>{
+  if (!me){ location.href="index.html"; return; }
+  if (!uid){ box.textContent="Kein Profil gewählt."; return; }
+
+  const snap = await getDoc(doc(db,"users",uid));
+  if (!snap.exists()){ box.textContent="Profil nicht gefunden."; return; }
+
+  const u = snap.data();
+  const s = u.stats || {};
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+      <div>
+        <div style="font-weight:900;font-size:18px">${u.name || "Handler"}</div>
+        <div class="small">${u.email || ""}</div>
+      </div>
+      <span class="badge">${uid === me.uid ? "Du" : "Profil"}</span>
+    </div>
+
+    <div style="height:12px"></div>
+
+    <div class="row">
+      <div class="stat"><div class="big">${s.totalFlights || 0}</div><div class="label">Abfertigungen</div></div>
+      <div class="stat"><div class="big">${(s.avgDelay ?? 0).toFixed ? s.avgDelay.toFixed(1) : (s.avgDelay||0)}</div><div class="label">Ø Delay</div></div>
+      <div class="stat"><div class="big">${s.totalPax || 0}</div><div class="label">Pax gesamt</div></div>
+      <div class="stat"><div class="big">${s.totalCargo || 0}</div><div class="label">Cargo (kg)</div></div>
+    </div>
+  `;
+});
+</script>
+
+<script>
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>location.href=b.dataset.go));
+</script>
+</body>
+</html>
