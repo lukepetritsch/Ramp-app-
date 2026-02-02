@@ -1,1 +1,197 @@
-<h1>Flüge hinzufügen & verwalten</h1>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Flüge • Ground Handling Log</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container" style="padding-bottom:72px">
+    <h2>🛫 Flüge</h2>
+
+    <div class="card">
+      <h3>➕ Flug hinzufügen</h3>
+      <div class="row">
+        <div><input id="flightNumber" placeholder="Flugnummer (LH123)"/></div>
+        <div><input id="registration" placeholder="Registrierung (D-AIPX)"/></div>
+        <div><input id="airline" placeholder="Airline"/></div>
+        <div><input id="aircraftType" placeholder="Flugzeugtyp (A320)"/></div>
+        <div><input id="from" placeholder="Start (FRA)"/></div>
+        <div><input id="to" placeholder="Destination (BCN)"/></div>
+        <div><input id="delayMinutes" type="number" placeholder="Delay Minuten (z.B. -3)"/></div>
+        <div><select id="delayCode"></select></div>
+        <div><input id="pax" type="number" placeholder="Passagiere"/></div>
+        <div><input id="cargo" type="number" placeholder="Cargo (kg)"/></div>
+      </div>
+
+      <div style="height:10px"></div>
+      <label class="small"><input id="special" type="checkbox"/> Sonderlackierung</label>
+      <div style="height:8px"></div>
+      <input id="livery" placeholder="Name der Sonderlackierung (optional)"/>
+
+      <div style="height:10px"></div>
+      <button id="saveFlight">Speichern</button>
+      <p class="small" id="msg"></p>
+    </div>
+
+    <div class="card">
+      <h3>📋 Deine Flüge</h3>
+      <ul class="list" id="list"></ul>
+    </div>
+  </div>
+
+  <nav>
+    <button data-go="dashboard.html">📊</button>
+    <button class="active" data-go="flights.html">🛫</button>
+    <button data-go="aircraft.html">✈️</button>
+    <button data-go="album.html">🎴</button>
+    <button data-go="social.html">👥</button>
+  </nav>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getFirestore, collection, addDoc, query, where, orderBy, getDocs, doc, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCC9zB_me4qdyBmHZ0TeUDPB1WoPNa6e1A",
+  authDomain: "ground-handling-log.firebaseapp.com",
+  projectId: "ground-handling-log",
+  appId: "1:771821879817:web:35ad14da4ab4613b832ed8"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const el = id => document.getElementById(id);
+const val = id => (el(id)?.value ?? "").trim();
+const intval = id => {
+  const v = el(id)?.value;
+  if (v === "" || v == null) return 0;
+  const n = parseInt(v,10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+function buildDelayCodes(){
+  const s = el("delayCode");
+  s.innerHTML = "";
+  const o0 = document.createElement("option");
+  o0.value = "";
+  o0.textContent = "IATA Delay Code (0–99)";
+  s.appendChild(o0);
+
+  for (let c=0; c<=99; c++){
+    const op = document.createElement("option");
+    op.value = String(c).padStart(2,"0");
+    op.textContent = String(c).padStart(2,"0");
+    s.appendChild(op);
+  }
+}
+buildDelayCodes();
+
+// UX: DelayCode nur wenn Delay != 0
+el("delayMinutes").addEventListener("input", ()=>{
+  const d = intval("delayMinutes");
+  el("delayCode").disabled = (d === 0);
+  if (d === 0) el("delayCode").value = "";
+});
+el("delayCode").disabled = true;
+
+async function loadFlights(uid){
+  const qy = query(
+    collection(db,"flights"),
+    where("userId","==",uid),
+    orderBy("timestamp","desc")
+  );
+  const snap = await getDocs(qy);
+
+  const list = el("list");
+  list.innerHTML = "";
+
+  snap.forEach(d=>{
+    const f=d.data();
+    const cls = f.delayMinutes <= 0 ? "delay-good" : f.delayMinutes <= 10 ? "delay-ok" : "delay-bad";
+
+    const li=document.createElement("li");
+    li.innerHTML = `
+      <span>
+        <strong>${f.flightNumber}</strong> • ${f.airline} • ${f.aircraftType}<br>
+        <span class="small">${f.registration} • ${f.from}→${f.to} • ${new Date(f.timestamp).toLocaleString()}</span><br>
+        <span class="small">👥 ${f.pax||0} • 📦 ${f.cargo||0}kg ${f.special ? " • 🎨 "+(f.livery||"Special") : ""}</span>
+      </span>
+      <span style="text-align:right">
+        <div class="${cls}" style="font-weight:800">${f.delayMinutes} min</div>
+        <div class="small">${f.delayCode ? "Code "+f.delayCode : ""}</div>
+        <button class="btn-secondary" style="margin-top:8px" data-del="${d.id}">Löschen</button>
+      </span>
+    `;
+    list.appendChild(li);
+  });
+
+  // delete handlers
+  list.querySelectorAll("button[data-del]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-del");
+      await deleteDoc(doc(db,"flights",id));
+      await loadFlights(uid);
+    });
+  });
+
+  if (!list.children.length){
+    list.innerHTML = `<li><span class="small">Noch keine Flüge. Füge oben einen hinzu.</span><span></span></li>`;
+  }
+}
+
+async function saveFlight(uid){
+  const delayMinutes = intval("delayMinutes");
+  const delayCode = delayMinutes === 0 ? "" : (el("delayCode").value || "");
+
+  const data = {
+    userId: uid,
+    flightNumber: val("flightNumber"),
+    registration: val("registration").toUpperCase(),
+    airline: val("airline"),
+    aircraftType: val("aircraftType"),
+    from: val("from").toUpperCase(),
+    to: val("to").toUpperCase(),
+    delayMinutes,
+    delayCode,
+    pax: intval("pax"),
+    cargo: intval("cargo"),
+    special: !!el("special").checked,
+    livery: val("livery"),
+    timestamp: Date.now()
+  };
+
+  // Pflichtfelder
+  if (!data.flightNumber || !data.registration || !data.aircraftType || !data.airline || !data.from || !data.to){
+    el("msg").textContent = "Bitte Flugnummer, Registrierung, Airline, Typ, Start und Destination ausfüllen.";
+    return;
+  }
+
+  el("msg").textContent = "Speichere…";
+  await addDoc(collection(db,"flights"), data);
+  el("msg").textContent = "✅ Flug gespeichert.";
+
+  // reset minimal
+  ["flightNumber","registration","from","to"].forEach(id=>el(id).value="");
+
+  await loadFlights(uid);
+}
+
+onAuthStateChanged(auth, (user)=>{
+  if (!user){ location.href="index.html"; return; }
+  loadFlights(user.uid);
+  el("saveFlight").addEventListener("click", ()=>saveFlight(user.uid));
+});
+</script>
+
+<script>
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>location.href=b.dataset.go));
+</script>
+</body>
+</html>
