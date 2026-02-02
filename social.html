@@ -1,1 +1,104 @@
-<h1>Social & Leaderboard</h1>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Social • Ground Handling Log</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="container" style="padding-bottom:72px">
+    <h2>👥 Social</h2>
+
+    <div class="card">
+      <input id="q" placeholder="User suchen (Name oder E-Mail)"/>
+      <div style="height:10px"></div>
+      <button id="searchBtn">Suchen</button>
+      <p class="small">Hinweis: Profile sind nur für eingeloggte User sichtbar.</p>
+    </div>
+
+    <div class="card">
+      <h3>🏆 Leaderboard (meiste Abfertigungen)</h3>
+      <ul class="list" id="leader"></ul>
+    </div>
+
+    <div class="card">
+      <h3>🔎 Suchergebnisse</h3>
+      <ul class="list" id="results"></ul>
+    </div>
+  </div>
+
+  <nav>
+    <button data-go="dashboard.html">📊</button>
+    <button data-go="aircraft.html">✈️</button>
+    <button data-go="album.html">🎴</button>
+    <button class="active" data-go="social.html">👥</button>
+  </nav>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCC9zB_me4qdyBmHZ0TeUDPB1WoPNa6e1A",
+  authDomain: "ground-handling-log.firebaseapp.com",
+  projectId: "ground-handling-log",
+  appId: "1:771821879817:web:35ad14da4ab4613b832ed8"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const leader = document.getElementById("leader");
+const results = document.getElementById("results");
+const qEl = document.getElementById("q");
+const searchBtn = document.getElementById("searchBtn");
+
+function addRow(target, name, right, uid){
+  const li=document.createElement("li");
+  li.innerHTML = `<span><strong>${name}</strong></span><span>${right}</span>`;
+  li.addEventListener("click", ()=>location.href=`profile.html?uid=${encodeURIComponent(uid)}`);
+  target.appendChild(li);
+}
+
+onAuthStateChanged(auth, async (me)=>{
+  if (!me){ location.href="index.html"; return; }
+
+  // Leaderboard: users nach totalFlights
+  const qy = query(collection(db,"users"), orderBy("stats.totalFlights","desc"), limit(10));
+  const snap = await getDocs(qy);
+
+  leader.innerHTML="";
+  snap.forEach(d=>{
+    const u=d.data();
+    addRow(leader, u.name || "Handler", `${u.stats?.totalFlights || 0}×`, u.uid);
+  });
+
+  searchBtn.addEventListener("click", async ()=>{
+    const term = qEl.value.trim().toLowerCase();
+    results.innerHTML="";
+    if (!term) return;
+
+    const all = await getDocs(query(collection(db,"users"), limit(25)));
+    all.forEach(d=>{
+      const u=d.data();
+      const hay = `${u.name||""} ${u.email||""}`.toLowerCase();
+      if (hay.includes(term)){
+        addRow(results, u.name || "Handler", "Profil", u.uid);
+      }
+    });
+
+    if (!results.children.length){
+      results.innerHTML = `<li><span class="small">Keine Treffer</span><span></span></li>`;
+    }
+  });
+});
+</script>
+
+<script>
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>location.href=b.dataset.go));
+</script>
+</body>
+</html>
