@@ -1,1 +1,125 @@
-<h1>Login – bereits implementiert</h1>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ground Handling Log – Login</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body class="center">
+
+  <div style="width:min(420px,100%)">
+    <h1>✈️ Ground Handling Log</h1>
+    <p class="small">Login für Bodenabfertiger</p>
+
+    <div class="card">
+      <button id="googleBtn">Mit Google anmelden</button>
+
+      <hr style="margin:16px 0;opacity:.2"/>
+
+      <input id="email" placeholder="E-Mail"/>
+      <input id="password" type="password" placeholder="Passwort"/>
+
+      <button id="emailLogin" class="btn-secondary">Login</button>
+      <button id="emailRegister" class="btn-secondary">Registrieren</button>
+    </div>
+
+    <p class="small">Private Web-App • Firebase Login</p>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  getRedirectResult,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCC9zB_me4qdyBmHZ0TeUDPB1WoPNa6e1A",
+  authDomain: "ground-handling-log.firebaseapp.com",
+  projectId: "ground-handling-log",
+  appId: "1:771821879817:web:35ad14da4ab4613b832ed8"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Google Login
+document.getElementById("googleBtn").onclick = async () => {
+  if (isIOS) {
+    await signInWithRedirect(auth, provider);
+  } else {
+    await signInWithPopup(auth, provider);
+  }
+};
+
+// E-Mail Login
+document.getElementById("emailLogin").onclick = async () => {
+  await signInWithEmailAndPassword(
+    auth,
+    email.value.trim(),
+    password.value
+  );
+};
+
+// Registrierung
+document.getElementById("emailRegister").onclick = async () => {
+  await createUserWithEmailAndPassword(
+    auth,
+    email.value.trim(),
+    password.value
+  );
+};
+
+// User anlegen (einmalig)
+async function ensureUser(user){
+  const ref = doc(db,"users",user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()){
+    await setDoc(ref,{
+      uid:user.uid,
+      name:user.displayName || "Handler",
+      email:user.email,
+      createdAt:Date.now(),
+      stats:{
+        totalFlights:0,
+        totalDelay:0,
+        avgDelay:0,
+        totalPax:0,
+        totalCargo:0,
+        avgScore:0
+      }
+    });
+  }
+}
+
+// Redirect (iOS)
+getRedirectResult(auth).then(async r=>{
+  if (r?.user){
+    await ensureUser(r.user);
+    location.href="dashboard.html";
+  }
+});
+
+// Bereits eingeloggt
+onAuthStateChanged(auth, async user=>{
+  if (user){
+    await ensureUser(user);
+    location.href="dashboard.html";
+  }
+});
+</script>
+</body>
+</html>
